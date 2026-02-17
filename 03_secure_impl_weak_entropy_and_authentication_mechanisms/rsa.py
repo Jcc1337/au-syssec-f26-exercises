@@ -5,6 +5,18 @@ from Crypto.Util.number import getPrime, GCD, inverse
 def encrypt(m, e, N):
 	return pow(m, e, N)
 
+# Right-to-left version without branches
+def decrypt_constant_time(c, d, N):
+    r = 1
+    x = c % N
+    while d > 0:
+        bit = d & 1
+        # Always execute both paths, use bit as selector
+        r = (r * (1 - bit) + (r * x) % N * bit) % N
+        x = (x * x) % N
+        d >>= 1
+    return r
+
 # Right-to-left version
 def decrypt(c, d, N):
     r = 1
@@ -57,7 +69,7 @@ def main(bits, message):
     plain = dec.to_bytes((N.bit_length() + 7) // 8, 'big')
     print()
     print(f"RSA ciphertext = {enc}")
-    print(f"RSA plaintext = {plain.decode("utf-8")}")
+    print(f"RSA plaintext = {plain.decode('utf-8')}")
 
     assert dec == m
     assert decrypt(enc, d, N) == decrypt_ltor(enc, d, N)
