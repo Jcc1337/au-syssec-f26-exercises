@@ -1,82 +1,42 @@
 #!/usr/bin/env python3
 
+from datetime import datetime
 import random
 import sys
+import time
+from tqdm import tqdm # install the tqdm package for a fancy progress bar
 from Crypto.Cipher import AES
-from datetime import datetime, timedelta
 
 
-def try_decrypt(ciphertext_file, timestamp):
-    """Try to decrypt with a given timestamp seed."""
-    try:
-        with open(ciphertext_file, 'rb') as f:
-            nonce = f.read(16)
-            tag = f.read(16)
-            ciphertext = f.read()
-        
-        # Recreate the key with the given timestamp
-        random.seed(int(timestamp))
+def decrypt(date, input_file, output_file):
+
+    date = datetime.strptime(date, '%Y-%m-%d')
+    t_start = int(date.timestamp())
+
+    with open(input_file, 'rb') as f_in:
+        nonce = f_in.read(16)
+        tag = f_in.read(16)
+        ciphertext = f_in.read()
+
+    #  for t in range(t_start, t_start + (60 * 60 * 24)):  # <- use this instead of the following line if you don't have tqdm
+    for t in tqdm(range(t_start, t_start + (60 * 60 * 24))):
+        random.seed(t)
         key = random.randbytes(16)
-        
-        # Try to decrypt
-        aes = AES.new(key, AES.MODE_GCM, nonce=nonce)
-        plaintext = aes.decrypt_and_verify(ciphertext, tag)
-        
-        return plaintext
-    except ValueError:
-        # GCM tag verification failed
-        return None
-    except Exception as e:
-        return None
+        try:
+            aes = AES.new(key, AES.MODE_GCM, nonce=nonce)
+            plaintext = aes.decrypt_and_verify(ciphertext, tag)
+            break
+        except:
+            continue
+    else:
+        print('decryption failed')
 
-
-def brute_force_decrypt(ciphertext_file, start_date, num_days=7):
-    """Brute force decrypt by trying timestamps in a range."""
-    
-    # Convert date to timestamp
-    start_timestamp = int(start_date.timestamp())
-    
-    print(f"Brute forcing timestamps from {start_date} to {start_date + timedelta(days=num_days)}")
-    print(f"That's {num_days * 86400} possible timestamps to try...")
-    
-    attempts = 0
-    for day_offset in range(num_days):
-        for second_in_day in range(86400):
-            timestamp = start_timestamp + day_offset * 86400 + second_in_day
-            
-            plaintext = try_decrypt(ciphertext_file, timestamp)
-            attempts += 1
-            
-            if plaintext is not None:
-                print(f"\n✓ SUCCESS! Found the key after {attempts} attempts")
-                print(f"Timestamp: {datetime.utcfromtimestamp(timestamp)} UTC")
-                print(f"Decrypted plaintext:")
-                print(plaintext.decode('utf-8', errors='replace'))
-                return plaintext
-            
-            if attempts % 10000 == 0:
-                current_time = datetime.utcfromtimestamp(timestamp)
-                print(f"Tried {attempts} timestamps... currently at {current_time} UTC")
-    
-    print(f"Failed to decrypt after {attempts} attempts")
-    return None
+    with open(output_file, 'wb') as f_out:
+        f_out.write(plaintext)
 
 
 if __name__ == '__main__':
-    if len(sys.argv) < 2:
-        print(f'usage: {sys.argv[0]} <ciphertext-file> [start_date] [num_days]')
-        print(f'  start_date format: YYYY-MM-DD (default: 7 days ago)')
-        print(f'  num_days: number of days to brute force (default: 7)')
+    if len(sys.argv) != 4:
+        print(f'usage: {sys.argv[0]} <date> <src-file> <dst-file>', file=sys.stderr)
         exit(1)
-    
-    ciphertext_file = sys.argv[1]
-    
-    # Default: try 7 days starting from 7 days ago
-    if len(sys.argv) >= 3:
-        start_date = datetime.strptime(sys.argv[2], '%Y-%m-%d')
-    else:
-        start_date = datetime.utcnow() - timedelta(days=7)
-    
-    num_days = int(sys.argv[3]) if len(sys.argv) >= 4 else 7
-    
-    brute_force_decrypt(ciphertext_file, start_date, num_days)
+    decrypt(sys.argv[1], sys.argv[2], sys.argv[3])
