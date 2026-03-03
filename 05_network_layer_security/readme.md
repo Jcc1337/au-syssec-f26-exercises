@@ -119,45 +119,20 @@ The `Upload Secrets` functionality is more interesting and allows the user to en
 Your final task is to _replace_ that public key with a key pair for which you know the private key (to be able to decrypt).
 The code for the server portion is provided for reference in the repository inside the folder `simple-website`.
 
-In order to achieve your goal, generate an RSA key pair in PEM format and plug the values marked as TODO in the file `simple-website/mitm_pk.py`. Now restart `mitmproxy` with the command below:
+In order to achieve your goal, generate an RSA key pair in PEM format and insert the public key marked as TODO in the file `mitm_pk.py`. You can generate the key pair by running the following commands:
+
+```
+$ openssl genrsa -out private.pem 2048
+$ openssl rsa -in private.pem -outform PEM -pubout -out public.pem
+```
+
+Now restart mitmproxy with the command below:
 
 ```
 $ mitmproxy --showhost -s mitm_pk.py
 ```
 
-Now the user will use a different public key, so you recover the secret message from the RSA encryption provided by the client.
-The `client.py` file in the repository or [this link](https://pycryptodome.readthedocs.io/en/latest/src/examples.html#encrypt-data-with-rsa)  may be useful.
-
-## BONUS Exercise: ARP Spoofing against router
-**The big picture:**\
-The goal is to mount a passive Man-in-the-Middle attack to be able to read *all* the traffic between a victim and a server (or any two devices, A and B), that are communicating over a non-local network. This time, we want a more realistic setup.
-
-First of all, revert the proxy configuration you performed in the previous exercise.
-Select one of the addresses in the range `192.168.3.2-69` (which will be called `X` from now on).
-Try to impersonate the Web server by running the ARP spoofing attack inside the VM:
-
-```
-sudo arpspoof -i <interface> -t <victim> 192.168.3.X
-```
-
-Contrary to the last session, you can still access the Web server `http://192.168.3.X/` in the *victim*. This is possible because ARP spoofing is ineffective here, since ARP does not resolve in the network `192.168.3.0` to which packets are _routed_. This will also have the side-effect that traffic directed towards `192.168.3.X` will be passed to the VM through the link layer and fix an [issue with VirtualBox](https://security.stackexchange.com/questions/197453/mitm-using-arp-spoofing-with-kali-linux-running-on-virtualbox-with-bridged-wifi).
-However, we can still impersonate the router.
-
-Choose randomly one address in the IP range `192.168.1.1-69` or `192.168.2.1-69` (depending if you are connected to `SYSSEC` or `NETSEC`) and manually configure this address as the gateway in your mobile device. You can use the same IP address you received before from DHCP for the *victim*. Now run the ARP spoofing attack below:
-
-```
-sudo arpspoof -i <interface> -t <victim> <router>
-```
-
-You will notice that connectivity between the mobile device and the Web server might stop, since traffic will be redirected to the VM and not be routed further.
-
-If you are running native Windows, you should instead run:
-
-```
-arpspoof.exe <router> <victim>
-```
-
-In the case of Windows, `arpspoof.exe` takes care of the routing, so you can skip to the part of running `mitmproxy`.
+After that, go to `http://192.168.3.X/pk` and check that the public key was changed.
 
 ## BONUS Exercise: mitmproxy in transparent mode
 
@@ -191,7 +166,7 @@ sudo sysctl -w net.inet.ip.redirect=0
 After these configurations are put in place, the mobile device will be able to connect again to the Web server. Start Wireshark in the VM to check that the traffic is still intercepted there. You can use the Login option to enter credentials and observe that they are captured by Wireshark, proving that the traffic is redirected to the VM.
 
 **Note:**\
-There are some hints and troubleshooting information [in this page](hints.md). Make sure to check it if you have problems or if you are running a native enrivonment without support for virtualization (such as an ARM-based Mac).
+There are some hints and troubleshooting information [in this page](hints.md). Make sure to check it if you have problems.
 
 Start Wireshark in the VM to check that the traffic is still intercepted there. You can use the Login option to enter credentials and observe that they are captured by Wireshark, proving that the traffic is proxied through the VM/laptop.
 Wireshark will capture traffic and demonstrate the power of a passive eavesdropping attacker. Let's mount a more powerful attack.
@@ -208,3 +183,34 @@ Now run `mitmproxy` in _transparent_ mode:
 $ mitmproxy --mode transparent --showhost
 ```
 The traffic from the *victim* should again be visible in the `mitmproxy` interface.
+
+## BONUS Exercise: ARP Spoofing against router
+**The big picture:**\
+The goal is to mount a passive Man-in-the-Middle attack to be able to read *all* the traffic between a victim and a server (or any two devices, A and B), that are communicating over a non-local network. This time, we want a more realistic setup.
+
+First of all, revert the proxy/router configuration you performed in the previous exercises.
+Select one of the addresses in the range `192.168.3.2-69` (which will be called `X` from now on).
+Try to impersonate the Web server by running the ARP spoofing attack inside the VM:
+
+```
+sudo arpspoof -i <interface> -t <victim> 192.168.3.X
+```
+
+Contrary to the last session, you can still access the Web server `http://192.168.3.X/` in the *victim*. This is possible because ARP spoofing is ineffective here, since ARP does not resolve in the network `192.168.3.0` to which packets are _routed_. This will also have the side-effect that traffic directed towards `192.168.3.X` will be passed to the VM through the link layer and fix an [issue with VirtualBox](https://security.stackexchange.com/questions/197453/mitm-using-arp-spoofing-with-kali-linux-running-on-virtualbox-with-bridged-wifi).
+However, we can still impersonate the router.
+
+Choose randomly one address in the IP range `192.168.1.1-69` or `192.168.2.1-69` (depending if you are connected to `SYSSEC` or `NETSEC`) and manually configure this address as the gateway in your mobile device. You can use the same IP address you received before from DHCP for the *victim*. Now run the ARP spoofing attack below:
+
+```
+sudo arpspoof -i <interface> -t <victim> <router>
+```
+
+You will notice that connectivity between the mobile device and the Web server might stop, since traffic will be redirected to the VM and not be routed further.
+
+If you are running native Windows, you should instead run:
+
+```
+arpspoof.exe <router> <victim>
+```
+
+In the case of Windows, `arpspoof.exe` takes care of the routing, so you can skip to the part of running `mitmproxy`.
